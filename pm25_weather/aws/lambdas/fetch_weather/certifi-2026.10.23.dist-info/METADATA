@@ -65,7 +65,6 @@ Or from the command line::
 
     $ python -m certifi
     /usr/local/lib/python3.7/site-packages/certifi/cacert.pem
-
 Enjoy!
 
 .. _`Requests`: https://requests.readthedocs.io/en/latest/
