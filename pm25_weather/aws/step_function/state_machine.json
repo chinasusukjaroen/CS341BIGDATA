@@ -1,0 +1,376 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Check_batch",
+  "States": {
+    "Check_batch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:check_batch:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "AlreadyProcessed?",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed",
+          "Comment": "Fail when python catch error handling"
+        }
+      ]
+    },
+    "AlreadyProcessed?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "StopAtAlreadyProcessed",
+          "Condition": "{% $states.input.check.status = \"ALREADY_PROCESSED\" %}"
+        },
+        {
+          "Next": "InvalidInput",
+          "Condition": "{% $states.input.check.status = \"INVALID_INPUT\" %}"
+        }
+      ],
+      "Default": "Validate_batch"
+    },
+    "StopAtAlreadyProcessed": {
+      "Type": "Succeed"
+    },
+    "Validate_batch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:validate_batch:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "IsValid",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed",
+          "Comment": "Fail when python catch error handling"
+        }
+      ]
+    },
+    "IsValid": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Quarantine_batch",
+          "Condition": "{% $states.input.validation.status = \"NOT_PASSED\" %}"
+        }
+      ],
+      "Default": "Fetch_weather"
+    },
+    "Fetch_weather": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:fetch_weather:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "FetchSucceeded?",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed",
+          "Comment": "Fail when python catch error handling"
+        }
+      ]
+    },
+    "FetchSucceeded?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "WeatherFetchFailed",
+          "Condition": "{% $states.input.fetch.status = \"FAILED\" %}"
+        }
+      ],
+      "Default": "Validate_weather"
+    },
+    "WeatherFetchFailed": {
+      "Type": "Fail"
+    },
+    "Validate_weather": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:validate_weather:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "IsWeatherValid",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed",
+          "Comment": "Fail when python catch error handling"
+        }
+      ]
+    },
+    "IsWeatherValid": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "WeatherFetchFailed",
+          "Condition": "{% $states.input.weather_validation.status = \"FAILED\" %}"
+        }
+      ],
+      "Default": "Transform_batch"
+    },
+    "Transform_batch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:transform_batch:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Verify_batch",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "Fail when python catch error handling",
+          "Next": "PipelineFailed"
+        }
+      ]
+    },
+    "PipelineFailed": {
+      "Type": "Fail"
+    },
+    "Verify_batch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:verify_batch:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "PublishIceberg",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "Fail when python catch error handling",
+          "Next": "PipelineFailed"
+        }
+      ]
+    },
+    "Analysis_batch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:analysis_batch:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Published",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "Fail when python catch error handling",
+          "Next": "PipelineFailed"
+        }
+      ]
+    },
+    "Quarantine_batch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:quarantine_batch:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Quarantined",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed",
+          "Comment": "Fail when python catch error handling"
+        }
+      ]
+    },
+    "Quarantined": {
+      "Type": "Succeed"
+    },
+    "Published": {
+      "Type": "Succeed"
+    },
+    "InvalidInput": {
+      "Type": "Fail"
+    },
+    "PublishIceberg": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Arguments": {
+        "JobName": "pm25-iceberg-full-year-publish",
+        "Arguments": {
+          "--BUCKET": "{% $states.input.bucket %}",
+          "--YEAR": "{% $states.input.batch_id %}",
+          "--RUN_ID": "{% $states.input.run_id %}",
+          "--DATABASE": "pm25_weather",
+          "--TABLE": "pm25_weather_iceberg",
+          "--MANIFEST_KEY": "{% $states.input.transform.manifest_key %}"
+        }
+      },
+      "Output": "{% $merge([$states.input, {'glue_publish_result': $states.result}]) %}",
+      "Next": "FinalizeIceberg",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed"
+        }
+      ]
+    },
+    "FinalizeIceberg": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "Payload": "{% $states.input %}",
+        "FunctionName": "arn:aws:lambda:us-east-1:197957376132:function:finalize_iceberg:$LATEST"
+      },
+      "Output": "{% $states.result.Payload %}",
+      "Next": "Analysis_batch",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "PipelineFailed"
+        }
+      ]
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
